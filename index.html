@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Google Drive Comments Extractor</title>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script>
+    function authenticate() {
+      return gapi.auth2.getAuthInstance()
+          .signIn({scope: "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly"})
+          .then(function() { console.log("Sign-in successful"); },
+                function(err) { console.error("Error signing in", err); });
+    }
+    function loadClient() {
+      return gapi.client.load("https://content.googleapis.com/discovery/v1/apis/drive/v3/rest")
+          .then(function() { console.log("GAPI client loaded for API"); },
+                function(err) { console.error("Error loading GAPI client for API", err); });
+    }
+    // Make sure the client is loaded and sign-in is complete before calling this method.
+    function execute(nextPageToken) {
+      params = {
+        "fileId": "1aJiqkNZ58oFVOrzmKeMqo5QNymvBYkYYSw1_e0ipnFE",
+        "includeDeleted": "false",
+        "fields": "*",
+        "pageSize": "100"};
+      if(nextPageToken) {
+        params["pageToken"] = nextPageToken;
+      }
+      return gapi.client.drive.comments.list(params)
+          .then(function(response) {
+                  var responseBody = JSON.parse(response["body"]);
+                  var nextPageToken = responseBody["nextPageToken"];
+                  var comments = responseBody["comments"];
+                  for (var i = 0; i < comments.length; i++) {
+                    var comment = comments[i];
+                    console.log("Comment", JSON.parse(comment["anchor"]));
+                    var anchor = JSON.parse(comment["anchor"]);
+                    var pageRef = (anchor["type"] == "page" ? anchor["pages"][0] : anchor["page"]);
+                    var link = "<td><a href=\"" +
+                      "https://docs.google.com/presentation/d/1aJiqkNZ58oFVOrzmKeMqo5QNymvBYkYYSw1_e0ipnFE/edit#slide=id." +
+                      pageRef +
+                      "\"> Go to page </a></td>";
+                    var commenter = "<td>" + comment["author"]["displayName"] + "</td>";
+                    var comment_text = "<td>" + comment["htmlContent"] + "</td>";
+                    var resolved = "<td>" + (comment["resolved"] ? "Yes" : "No") + "</td>"
+                    $("#comments").append("<tr>" + link + commenter + comment_text + resolved + "</tr>");
+                  }
+                  if(nextPageToken) {
+                    execute(nextPageToken);
+                  }
+                },
+                function(err) { console.error("Execute error", err); });
+    }
+    gapi.load("client:auth2", function() {
+      gapi.auth2.init({client_id: "624577723289-i2ika444ae9p9u7kke4vksaol2t6r37v.apps.googleusercontent.com"});
+    });
+  </script>
+</head>
+
+<body>
+  <button onclick="authenticate().then(loadClient)">Authorise</button>
+  <button onclick="execute()">Start loading comments</button>
+  <table id="comments">
+    <tr>
+      <th>
+        Link
+      </th>
+      <th>
+        From
+      </th>
+      <th>
+        Comment
+      </th>
+      <th>
+        Resolved?
+      </th>
+    </tr>
+  </table>
+</body>
+</html>
